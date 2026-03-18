@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudySprint</title>
+<style>
+body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f0f4f8; color:#333; }
+header { background:#4cafef; color:white; text-align:center; padding:20px 0; font-size:1.8em; font-weight:bold; }
+.container { max-width:800px; margin:20px auto; padding:0 20px; }
+.xp-bar { background:#ddd; border-radius:20px; overflow:hidden; height:20px; margin-bottom:10px; }
+.xp-fill { height:100%; width:0; background:#4cafef; transition:width 0.5s; }
+.task-input { display:flex; margin-bottom:20px; flex-wrap:wrap; gap:10px; }
+.task-input input, .task-input select { flex:1; padding:10px; font-size:1em; }
+.task-input button { padding:10px 20px; background:#4cafef; color:white; border:none; cursor:pointer; }
+ul { list-style:none; padding-left:0; }
+li { background:white; padding:10px; margin-bottom:10px; display:flex; justify-content:space-between; border-radius:5px; }
+li.completed { text-decoration:line-through; opacity:0.7; }
+.stats { margin-top:20px; text-align:center; }
+.stats span { font-weight:bold; margin-right:15px; }
+.focus-mode { text-align:center; margin-top:20px; }
+.focus-mode button { padding:10px 20px; background:#ff9800; color:white; border:none; cursor:pointer; margin-top:5px; }
+.focus-timer { font-size:1.5em; margin-top:10px; }
+.challenge { background:#ffe082; padding:10px; border-radius:5px; margin-bottom:20px; }
+.reflection { margin-top:20px; }
+.reflection textarea { width:100%; height:60px; padding:10px; font-size:1em; }
+</style>
+</head>
+<body>
+
+<header>StudySprint</header>
+<div class="container">
+
+  <div class="xp-bar"><div id="xp-fill" class="xp-fill"></div></div>
+  <p>Level: <span id="level">1</span> | XP: <span id="xp">0</span>/100 | Coins: <span id="coins">0</span> | Streak: <span id="streak">0</span></p>
+
+  <div class="task-input">
+    <input type="text" id="task-name" placeholder="Enter task or goal">
+    <select id="task-subject">
+      <option value="Personal">Personal</option>
+      <option value="Fitness">Fitness</option>
+      <option value="Creativity">Creativity</option>
+      <option value="Learning">Learning</option>
+    </select>
+    <input type="date" id="task-date">
+    <button onclick="addTask()">Add Task</button>
+  </div>
+
+  <ul id="task-list"></ul>
+
+  <div class="challenge" id="challenge-box">
+    <strong>Mini-Challenge:</strong> Complete 2 tasks in Learning today!
+  </div>
+
+  <div class="focus-mode">
+    <button onclick="startFocus()">Start 25-min StudySprint Focus</button>
+    <div id="focus-timer" class="focus-timer">25:00</div>
+  </div>
+
+  <div class="reflection">
+    <textarea id="reflection-text" placeholder="After a task, reflect: What did I learn?"></textarea>
+    <button onclick="saveReflection()">Save Reflection</button>
+  </div>
+
+</div>
+
+<script>
+let xp = 0, level = 1, coins = 0, streak = 0, xpForLevel = 100;
+let subjectXP = { Personal:0, Fitness:0, Creativity:0, Learning:0 };
+
+// Load saved data
+function load() {
+  xp = Number(localStorage.getItem("ss_xp")) || 0;
+  level = Number(localStorage.getItem("ss_level")) || 1;
+  coins = Number(localStorage.getItem("ss_coins")) || 0;
+  streak = Number(localStorage.getItem("ss_streak")) || 0;
+  subjectXP = JSON.parse(localStorage.getItem("ss_subjectXP")) || { Personal:0, Fitness:0, Creativity:0, Learning:0 };
+  const tasks = JSON.parse(localStorage.getItem("ss_tasks")) || [];
+  tasks.forEach(t=>createTask(t.name, t.subject, t.date, t.completed));
+  updateStats();
+}
+function save() {
+  localStorage.setItem("ss_xp", xp);
+  localStorage.setItem("ss_level", level);
+  localStorage.setItem("ss_coins", coins);
+  localStorage.setItem("ss_streak", streak);
+  localStorage.setItem("ss_subjectXP", JSON.stringify(subjectXP));
+  localStorage.setItem("ss_tasks", JSON.stringify(getTasks()));
+}
+
+// Tasks
+function addTask() {
+  const name = document.getElementById("task-name").value.trim();
+  const subject = document.getElementById("task-subject").value;
+  const date = document.getElementById("task-date").value;
+  if(!name) return;
+  createTask(name, subject, date, false);
+  document.getElementById("task-name").value="";
+  document.getElementById("task-date").value="";
+  save();
+}
+function createTask(name, subject, date, done) {
+  const li = document.createElement("li");
+  li.innerHTML = `<span>${name} [${subject}] ${date? "(" + date + ")":""}</span> <button onclick="completeTask(this)">✔</button>`;
+  li.dataset.subject = subject;
+  li.dataset.date = date;
+  if(done) li.classList.add("completed");
+  document.getElementById("task-list").appendChild(li);
+}
+function completeTask(btn) {
+  const li = btn.parentElement;
+  if(li.classList.contains("completed")) return;
+  li.classList.add("completed");
+  const subj = li.dataset.subject;
+  subjectXP[subj] += 25;
+  xp += 25; coins += 15; streak++;
+  if(xp>=xpForLevel){ xp-=xpForLevel; level++; alert(`🎉 StudySprint Level Up! Level ${level}!`);}
+  updateStats(); save();
+}
+
+// Stats
+function updateStats() {
+  document.getElementById("xp").innerText = xp;
+  document.getElementById("level").innerText = level;
+  document.getElementById("coins").innerText = coins;
+  document.getElementById("streak").innerText = streak;
+  document.getElementById("xp-fill").style.width = (xp/xpForLevel*100)+"%";
+}
+
+// Get tasks for saving
+function getTasks() {
+  const arr=[];
+  document.querySelectorAll("#task-list li").forEach(li=>{
+    arr.push({name: li.querySelector("span").innerText, subject: li.dataset.subject, date: li.dataset.date, completed: li.classList.contains("completed")});
+  });
+  return arr;
+}
+
+// Focus Timer
+let focusInterval;
+function startFocus() {
+  clearInterval(focusInterval);
+  let time=25*60;
+  const timerEl = document.getElementById("focus-timer");
+  focusInterval=setInterval(()=>{
+    let m=Math.floor(time/60), s=time%60;
+    timerEl.innerText=`${m}:${s.toString().padStart(2,"0")}`;
+    time--;
+    if(time<0){
+      clearInterval(focusInterval);
+      alert("🎉 Focus complete! +15 XP, +10 Coins");
+      xp+=15; coins+=10; updateStats(); save();
+      timerEl.innerText="25:00";
+    }
+  },1000);
+}
+
+// Reflections
+function saveReflection() {
+  const text = document.getElementById("reflection-text").value.trim();
+  if(!text) return alert("Write something to reflect!");
+  let reflections = JSON.parse(localStorage.getItem("ss_reflections")) || [];
+  reflections.push({text, date:new Date().toLocaleString()});
+  localStorage.setItem("ss_reflections", JSON.stringify(reflections));
+  document.getElementById("reflection-text").value="";
+  alert("Reflection saved in StudySprint ✅");
+}
+
+// Initialize
+load();
+</script>
+
+</body>
+</html>
